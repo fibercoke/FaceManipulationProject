@@ -7,7 +7,7 @@ import tensorflow as tf
 from yolov3_tf2.models import (
     YoloV3, YoloV3Tiny
 )
-from yolov3_tf2.dataset import transform_images
+from yolov3_tf2.dataset_plate import transform_images
 
 from tensorflow.python.eager import def_function
 from tensorflow.python.framework import tensor_spec

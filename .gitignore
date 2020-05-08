@@ -138,3 +138,16 @@ dmypy.json
 .pyre/
 
 # End of https://www.gitignore.io/api/python
+/bzh_ckpts/
+/chars_checkpoints/
+/chars_logs/
+/checkpoints/
+/checkpoints_sgd_0.01/
+/colab-tiny-logs/
+/tiny/
+/data/Chars_data/
+/data/my_chars_data/
+/data/Plate_dataset/
+/data/plate_uncut/
+/last_ckpts/
+/yolo-v3-tiny.keras.save/
