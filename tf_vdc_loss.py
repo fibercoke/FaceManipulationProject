@@ -44,7 +44,7 @@ class VDCLoss(Loss):
 
         return (p, offset, alpha_shp, alpha_exp), (pg, offsetg, alpha_shpg, alpha_expg)
 
-    def __call__(self, y_pred: tf.Tensor, y_true: tf.Tensor, **kwargs):
+    def call(self, y_pred: tf.Tensor, y_true: tf.Tensor):
         # y_true = tf.reshape(y_true, shape=y_pred.shape)
         (p, offset, alpha_shp, alpha_exp), (pg, offsetg, alpha_shpg, alpha_expg) \
             = self.reconstruct_and_parse(y_pred, y_true)
