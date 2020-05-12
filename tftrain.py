@@ -1,9 +1,6 @@
 import logging
 from time import strftime
 
-import logging
-from time import strftime
-
 import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.python.keras import Sequential
@@ -54,56 +51,22 @@ def main():
     model.summary()
     # step2: optimization: loss and optimization method
     criterion = VDCLoss()
-    # criterion = keras.losses.MeanSquaredError()
-    # if args.loss.lower() == 'wpdc':
-    #    print(args.opt_style)
-    #    criterion = WPDCLoss(opt_style=args.opt_style).cuda()
-    #    logging.info('Use WPDC Loss')
-    # elif args.loss.lower() == 'vdc':
-    #    criterion = VDCLoss(opt_style=args.opt_style).cuda()
-    #    logging.info('Use VDC Loss')
-    # elif args.loss.lower() == 'pdc':
-    #    criterion = nn.MSELoss(size_average=args.size_average).cuda()
-    #    logging.info('Use PDC loss')
-    # else:
-    #    raise Exception(f'Unknown Loss {args.loss}')
 
     # optimizer = keras.optimizers.SGD(lr=args.base_lr, momentum=args.momentum, decay=args.weight_decay, nesterov=True)
     optimizer = keras.optimizers.Adam()
-    # step 2.1 resume
-    # if args.resume:
-    #    if Path(args.resume).is_file():
-    #        logging.info(f'=> loading checkpoint {args.resume}')
-    #
-    #        checkpoint = torch.load(args.resume, map_location=lambda storage, loc: storage)['state_dict']
-    #        # checkpoint = torch.load(args.resume)['state_dict']
-    #        model.load_state_dict(checkpoint)
-    #
-    #    else:
-    #        logging.info(f'=> no checkpoint found at {args.resume}')
 
-    # step3: data
-    # normalize = NormalizeGjz(mean=127.5, std=128)  # may need optimization
-    # train_x = tf.data.TextLineDataset(args.filelists_train).map(read_img(args.root))
-    # train_y = tf.data.Dataset.from_tensor_slices(_load(args.param_fp_train))
-    # val_x = tf.data.TextLineDataset(args.filelists_val).map(read_img(args.root))
-    # val_y = tf.data.Dataset.from_tensor_slices(_load(args.param_fp_val))
-    # train_dataset = tf.data.Dataset.zip((train_x, train_y))\
+    # step3: load dataset
     train_dataset = tf.data.TFRecordDataset('train_aug.tfrecord')
     train_dataset = train_dataset.map(lambda x: parse_tfrecord(x, 120))
     train_dataset = train_dataset.shuffle(buffer_size=1024)
     train_dataset = train_dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
     train_dataset = train_dataset.batch(batch_size=128)
-    # val_dataset = tf.data.Dataset.zip((val_x, val_y))\
 
     val_dataset = tf.data.TFRecordDataset('test_aug.tfrecord')
     val_dataset = val_dataset.map(lambda x: parse_tfrecord(x, 120))
     val_dataset = val_dataset.shuffle(buffer_size=1024)
     val_dataset = val_dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
     val_dataset = val_dataset.batch(batch_size=32)
-    # IPython.embed()
-
-    # model.load_weights('checkpoints/xps_first').expect_partial()
 
     # step4: run
 
