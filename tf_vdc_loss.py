@@ -8,11 +8,11 @@ from utils.params import *
 
 def _parse_param_batch(param: tf.Tensor):
     N = tf.shape(param)[0]
-    p_ = tf.reshape(param[:, :12], shape=(N, 3, 4))
+    p_ = tf.reshape(param[:, :12], shape=(N, 3, -1))
     p = p_[:, :, :3]
     offset = tf.reshape(p_[:, :, -1], shape=(N, 3, 1))
-    alpha_shp = tf.reshape(param[:, 12:52], shape=(N, 40, 1))
-    alpha_exp = tf.reshape(param[:, 52:], shape=(N, 10, 1))
+    alpha_shp = tf.reshape(param[:, 12:52], shape=(N, -1, 1))
+    alpha_exp = tf.reshape(param[:, 52:], shape=(N, -1, 1))
     return p, offset, alpha_shp, alpha_exp
 
 
@@ -59,8 +59,7 @@ class VDCLoss(Loss):
         return ret
 
     def calc_vertex(self, alpha_expg, alpha_shpg, offsetg, pg):
-        tmp = (self.u + self.w_shp @ alpha_shpg + self.w_exp @ alpha_expg)
-        gt_vertex = pg @ tf.transpose(
-            tf.reshape(tmp, shape=(tf.shape(tmp)[0], 53215, 3)),
-            perm=(0, 2, 1)) + offsetg
+        tmp = (self.u + tf.matmul(self.w_shp, alpha_shpg) + tf.matmul(self.w_exp, alpha_expg))
+        tmp = tf.reshape(tmp, shape=(tf.shape(tmp)[0], -1, 3))
+        gt_vertex = tf.matmul(pg, tf.transpose(tmp, perm=(0, 2, 1))) + offsetg
         return gt_vertex

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # coding: utf-8
+from math import sqrt
 
 import tensorflow as tf
 from tensorflow.python.keras.losses import Loss
@@ -44,80 +45,83 @@ class WPDCLoss(Loss):
 
         return (p, offset, alpha_shp, alpha_exp), (pg, offsetg, alpha_shpg, alpha_expg)
 
-    def _calc_weights_resample(self, input_, target_):
+    def _calc_weights_resample(self, input_: tf.Tensor, target_: tf.Tensor):
         # resample index
-        if self.resample_num <= 0:
-            keypoints_mix = self.keypoints
-        else:
-            index = torch.randperm(self.w_shp_length)[:self.resample_num].reshape(-1, 1)
-            keypoints_resample = torch.cat((3 * index, 3 * index + 1, 3 * index + 2), dim=1).view(-1).cuda()
-            keypoints_mix = torch.cat((self.keypoints, keypoints_resample))
-        w_shp_base = self.w_shp[keypoints_mix]
-        u_base = self.u[keypoints_mix]
-        w_exp_base = self.w_exp[keypoints_mix]
+        # if self.resample_num <= 0:
+        #    keypoints_mix = self.keypoints
+        # else:
+        #    tf.random.
+        #    index = torch.randperm(self.w_shp_length)[:self.resample_num].reshape(-1, 1)
+        #    keypoints_resample = torch.cat((3 * index, 3 * index + 1, 3 * index + 2), dim=1).view(-1).cuda()
+        #    keypoints_mix = torch.cat((self.keypoints, keypoints_resample))
 
-        input = torch.tensor(input_.data.clone(), requires_grad=False)
-        target = torch.tensor(target_.data.clone(), requires_grad=False)
+        keypoints_mix = self.keypoints
+        w_shp_base = tf.gather(self.w_shp, keypoints_mix)
+        u_base = tf.gather(self.u, keypoints_mix)
+        w_exp_base = tf.gather(self.w_exp, keypoints_mix)
 
         (p, offset, alpha_shp, alpha_exp), (pg, offsetg, alpha_shpg, alpha_expg) \
-            = self.reconstruct_and_parse(input, target)
+            = self.reconstruct_and_parse(input_, target_)
 
-        input = self.param_std * input + self.param_mean
-        target = self.param_std * target + self.param_mean
+        input = self.param_std * input_ + self.param_mean
+        target = self.param_std * target_ + self.param_mean
 
-        N = input.shape[0]
+        N = tf.shape(input)[0]
 
-        offset[:, -1] = offsetg[:, -1]
+        offset = tf.concat((offset[:, :-1], offsetg[:, -1:]), axis=1)
 
-        weights = torch.zeros_like(input, dtype=torch.float)
-        tmpv = (u_base + w_shp_base @ alpha_shp + w_exp_base @ alpha_exp).view(N, -1, 3).permute(0, 2, 1)
+        tmpv = u_base + tf.matmul(w_shp_base, alpha_shp) + tf.matmul(w_exp_base, alpha_exp)
+        tmpv = tf.reshape(tmpv, shape=(tf.shape(tmpv)[0], -1, 3))
+        tmpv = tf.transpose(tmpv, perm=(0, 2, 1))
 
-        tmpv_norm = torch.norm(tmpv, dim=2)
+        tmpv_norm = tf.norm(tmpv, axis=2)
         offset_norm = sqrt(w_shp_base.shape[0] // 3)
 
         # for pose
-        param_diff_pose = torch.abs(input[:, :11] - target[:, :11])
+        param_diff_pose = tf.abs(input[:, :11] - target[:, :11])
+        weight_lst = []
         for ind in range(11):
             if ind in [0, 4, 8]:
-                weights[:, ind] = param_diff_pose[:, ind] * tmpv_norm[:, 0]
+                weight_lst.append(param_diff_pose[:, ind] * tmpv_norm[:, 0])
             elif ind in [1, 5, 9]:
-                weights[:, ind] = param_diff_pose[:, ind] * tmpv_norm[:, 1]
+                weight_lst.append(param_diff_pose[:, ind] * tmpv_norm[:, 1])
             elif ind in [2, 6, 10]:
-                weights[:, ind] = param_diff_pose[:, ind] * tmpv_norm[:, 2]
+                weight_lst.append(param_diff_pose[:, ind] * tmpv_norm[:, 2])
             else:
-                weights[:, ind] = param_diff_pose[:, ind] * offset_norm
+                weight_lst.append(param_diff_pose[:, ind] * offset_norm)
 
         ## This is the optimizest version
         # for shape_exp
         magic_number = 0.00057339936  # scale
-        param_diff_shape_exp = torch.abs(input[:, 12:] - target[:, 12:])
+        param_diff_shape_exp = tf.abs(input[:, 12:] - target[:, 12:])
         # weights[:, 12:] = magic_number * param_diff_shape_exp * self.w_norm
-        w = torch.cat((w_shp_base, w_exp_base), dim=1)
-        w_norm = torch.norm(w, dim=0)
+        w = tf.concat((w_shp_base, w_exp_base), axis=1)
+        w_norm = tf.norm(w, axis=0)
         # print('here')
-        weights[:, 12:] = magic_number * param_diff_shape_exp * w_norm
+        # weights[:, 12:] = magic_number * param_diff_shape_exp * w_norm
+        weights_mid = tf.zeros(shape=tf.shape(input_)[0])
+        weights_mid = tf.expand_dims(weights_mid, axis=1)
 
         eps = 1e-6
-        weights[:, :11] += eps
-        weights[:, 12:] += eps
+
+        weights_A = tf.stack(weight_lst, axis=1)
+        weights_B = magic_number * param_diff_shape_exp * w_norm
+
+        weights = tf.concat((weights_A + eps, weights_mid, weights_B + eps), axis=1)
 
         # normalize the weights
-        maxes, _ = weights.max(dim=1)
-        maxes = maxes.view(-1, 1)
+        maxes = tf.reduce_max(weights, axis=1)
+        # maxes, _ = weights.max(dim=1)
+        # maxes = maxes.view(-1, 1)
+        maxes = tf.reshape(maxes, shape=(-1, 1))
         weights /= maxes
-
-        # zero the z
-        weights[:, 11] = 0
 
         return weights
 
-    def forward(self, input, target, weights_scale=10):
-        if self.opt_style == 'resample':
-            weights = self._calc_weights_resample(input, target)
-            loss = weights * (input - target) ** 2
-            return loss.mean()
-        else:
-            raise Exception(f'Unknown opt style: {self.opt_style}')
+    def call(self, y_true, y_pred):
+        weights = self._calc_weights_resample(y_pred, y_true)
+        loss = weights * tf.square(y_pred - y_true)
+        return tf.reduce_mean(loss)
 
 
 if __name__ == '__main__':
