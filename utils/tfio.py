@@ -17,11 +17,19 @@ def mkdir(d):
 
 def read_img(root: str):
     def _read_img(path):
-        image_string = tf.io.read_file(root + path)
+        image_string = tf.io.read_file(os.path.join(root, path))
         image_decoded = tf.image.decode_jpeg(image_string, channels=3)
         image = tf.image.resize(image_decoded, (120, 120))
         image /= 255.0
-        return tf.reshape(image, shape=(1, 120, 120, 3))
+        return image
+
+    return _read_img
+
+
+def read_raw_img(root: str):
+    def _read_img(path):
+        image_string = tf.io.read_file(os.path.join(root, path))
+        return image_string
 
     return _read_img
 
@@ -39,7 +47,8 @@ def _load(fp):
     if suffix == 'npy':
         return np.load(fp)
     elif suffix == 'pkl':
-        return pickle.load(open(fp, 'rb'))
+        tmp = pickle.load(open(fp, 'rb'))
+        return tmp
 
 
 def _dump(wfp, obj):

@@ -16,7 +16,7 @@ d = make_abs_path('../train.configs')
 keypoints = _load(osp.join(d, 'keypoints_sim.npy'))
 w_shp = _load(osp.join(d, 'w_shp_sim.npy'))
 w_exp = _load(osp.join(d, 'w_exp_sim.npy'))  # simplified version
-meta = _load(osp.join(d, 'param_whitening.pkl'))
+meta = _load(osp.join(d, 'param_whiten.pkl'))
 # param_mean and param_std are used for re-whitening
 param_mean = meta.get('param_mean')
 param_std = meta.get('param_std')

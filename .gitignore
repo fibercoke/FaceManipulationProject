@@ -44,3 +44,6 @@ samples/
 BFM_Remove_Neck
 visualize
 
+/checkpoints/
+/train_aug.tfrecord
+/test_aug.tfrecord

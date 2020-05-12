@@ -4,13 +4,18 @@
 import argparse
 import logging
 import os.path as osp
+from time import strftime
 
 import tensorflow as tf
 import tensorflow.keras as keras
+from tensorflow.python.keras import Sequential
+from tensorflow.python.keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
+from tensorflow.python.keras.layers import GlobalAveragePooling2D, Flatten, Dense
 
 from tf_vdc_loss import VDCLoss
+from tfrecord_dataset_utils import parse_tfrecord
 from utils.tfddfa import str2bool
-from utils.tfio import mkdir, _load, read_img
+from utils.tfio import mkdir
 
 # global args (configuration)
 args = None
@@ -26,8 +31,6 @@ def parse_args():
     parser.add_argument('-b', '--batch-size', default=128, type=int)
     parser.add_argument('-vb', '--val-batch-size', default=32, type=int)
     parser.add_argument('--base-lr', '--learning-rate', default=0.001, type=float)
-    parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
-                        help='momentum')
     parser.add_argument('--weight-decay', '--wd', default=5e-4, type=float)
     parser.add_argument('--print-freq', '-p', default=20, type=int)
     parser.add_argument('--resume', default='', type=str, metavar='PATH')
@@ -170,6 +173,9 @@ def validate(val_loader, model, criterion, epoch):
 
 def main():
     parse_args()  # parse global argsl
+    physical_devices = tf.config.experimental.list_physical_devices('GPU')
+    for physical_device in physical_devices:
+        tf.config.experimental.set_memory_growth(physical_device, True)
 
     # logging setup
     logging.basicConfig(
@@ -184,9 +190,25 @@ def main():
     print_args(args)  # print args
 
     # step1: define the model structure
-    model = keras.applications.mobilenet_v2.MobileNetV2(input_shape=(120, 120, 3), alpha=1.0, include_top=True,
-                                                        weights=None, input_tensor=None, pooling=None,
-                                                        classes=62)
+    # model = keras.applications.mobilenet_v2.MobileNetV2(input_shape=(120, 120, 3), alpha=1.0, include_top=True,
+    #                                                    weights=None, input_tensor=None, pooling=None,
+    #                                                    classes=62)
+
+    base_model = keras.applications.mobilenet_v2.MobileNetV2(input_shape=(120, 120, 3), alpha=1.0, include_top=False,
+                                                             weights='imagenet', input_tensor=None, pooling=None)
+    base_model.summary()
+
+    for layer in base_model.layers:
+        layer.trainable = False
+
+    model = Sequential()
+    model.add(base_model)
+    model.add(GlobalAveragePooling2D())
+    model.add(Flatten())
+    model.add(Dense(512, activation='relu'))
+    # model.add(Dropout(0.1))
+    model.add(Dense(62, activation='softmax'))
+    model.summary()
     # step2: optimization: loss and optimization method
     criterion = VDCLoss()
     # criterion = keras.losses.MeanSquaredError()
@@ -219,31 +241,47 @@ def main():
 
     # step3: data
     # normalize = NormalizeGjz(mean=127.5, std=128)  # may need optimization
-    train_x = tf.data.TextLineDataset(args.filelists_train).map(read_img(args.root))
-    train_y = tf.data.Dataset.from_tensor_slices(_load(args.param_fp_train))
-    val_x = tf.data.TextLineDataset(args.filelists_val).map(read_img(args.root))
-    val_y = tf.data.Dataset.from_tensor_slices(_load(args.param_fp_val))
-    train_dataset = tf.data.Dataset.zip((train_x, train_y))
+    # train_x = tf.data.TextLineDataset(args.filelists_train).map(read_img(args.root))
+    # train_y = tf.data.Dataset.from_tensor_slices(_load(args.param_fp_train))
+    # val_x = tf.data.TextLineDataset(args.filelists_val).map(read_img(args.root))
+    # val_y = tf.data.Dataset.from_tensor_slices(_load(args.param_fp_val))
+    # train_dataset = tf.data.Dataset.zip((train_x, train_y))\
+    train_dataset = tf.data.TFRecordDataset('train_aug.tfrecord')
+    train_dataset = train_dataset.map(lambda x: parse_tfrecord(x, 120))
+    train_dataset = train_dataset.shuffle(buffer_size=1024)
+    train_dataset = train_dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    train_dataset = train_dataset.batch(batch_size=128)
+    # val_dataset = tf.data.Dataset.zip((val_x, val_y))\
+
+    val_dataset = tf.data.TFRecordDataset('test_aug.tfrecord')
+    val_dataset = val_dataset.map(lambda x: parse_tfrecord(x, 120))
+    val_dataset = val_dataset.shuffle(buffer_size=1024)
+    val_dataset = val_dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    val_dataset = val_dataset.batch(batch_size=32)
     # IPython.embed()
+
+    # model.load_weights('checkpoints/xps_first').expect_partial()
 
     # step4: run
     if args.test_initial:
         logging.info('Testing from initial')
 
+    time_str = strftime("%Y-%m-%d-%H%M%S")
+    callbacks = [
+        ReduceLROnPlateau(verbose=1, patience=12),
+        EarlyStopping(patience=20, verbose=1),
+        ModelCheckpoint('checkpoints/imagenet_xps_first_{epoch}.tf', verbose=1,
+                        save_best_only=False, save_weights_only=True),
+        TensorBoard(log_dir="logs/imagenet_tensorboard_log_" + time_str)
+    ]
+
     model.compile(optimizer=optimizer, loss=criterion)
-    tensorboard_callback = keras.callbacks.TensorBoard(log_dir="logs/test")
-    model.fit(train_dataset, epochs=args.epochs, callbacks=[tensorboard_callback], batch_size=512, workers=8)
-
-
-#    for epoch in range(args.start_epoch, args.epochs + 1):
-#        # adjust learning rate
-#        adjust_learning_rate(optimizer, epoch, args.milestones)
-#
-#        # train for one epoch
-#        train(train_loader, model, criterion, optimizer, epoch)
-#        filename = f'{args.snapshot}_checkpoint_epoch_{epoch}.pth.tar'
-#        save_checkpoint(model, filename)
-#        validate(val_loader, model, criterion, epoch)
+    model.fit(train_dataset,
+              validation_data=val_dataset,
+              epochs=args.epochs,
+              callbacks=callbacks,
+              workers=8,
+              initial_epoch=0)
 
 
 if __name__ == '__main__':
