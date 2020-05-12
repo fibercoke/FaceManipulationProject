@@ -47,3 +47,7 @@ visualize
 /checkpoints/
 /train_aug.tfrecord
 /test_aug.tfrecord
+/tecfg.tar.gz
+/test.configs.zip
+/train.configs.zip
+/trcfg.tar.gz
