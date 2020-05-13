@@ -36,6 +36,8 @@ def main(_argv):
         model = CModel(size=FLAGS.classifier_size, class_num=class_num, weights=None)
         model.load_weights(FLAGS.classifier_weights).expect_partial()
 
+    acc = 0
+    tol = 0
     for xml in tqdm(filename for filename in os.listdir(FLAGS.xml_in_root_path) if filename.endswith('.xml')):
         logging.info(xml)
         annotation_xml = lxml.etree.fromstring(open(os.path.join(FLAGS.xml_in_root_path, xml)).read())
@@ -88,9 +90,13 @@ def main(_argv):
             plate_text = "".join(lst)
             print("gt:", annotation['object'][0]['platetext'])
             print("pred:", plate_text)
+            tol += 1
+            if plate_text == annotation['object'][0]['platetext']:
+                acc += 1
             xml_str = generate_xml(filename=img_file_name, plate_text=plate_text)
             with open(os.path.join(FLAGS.xml_out_root_path, img_file_name.replace('jpg', 'xml')), 'wb') as fp:
                 fp.write(xml_str)
+            print('acc:', acc / tol)
 
 
 
@@ -101,11 +107,11 @@ if __name__ == '__main__':
     flags.DEFINE_string('xml_in_root_path', './data/Plate_dataset/AC/train/xml/', 'path to input xml')
     flags.DEFINE_string('xml_out_root_path', './data/Plate_dataset/AC/test/xml_pred/', 'path to output xml')
     flags.DEFINE_string('classifier_classes', './data/chars_data.names', 'path to classes file')
-    flags.DEFINE_string('classifier_weights', './chars_checkpoints/resnet101v2_train_98.tf', 'path to weights file')
+    flags.DEFINE_string('classifier_weights', './chars_checkpoints/my_resnet101v2_train_acc_0.8100_33_2020-05-08-234204.tf', 'path to weights file')
     flags.DEFINE_integer('classifier_size', 32, 'size of each character should be resize to')
     flags.DEFINE_bool('painting', False, 'if plt.show()')
     flags.DEFINE_bool('save_image', True, 'should save image for training?')
-    flags.DEFINE_string('save_image_root', './data/my_chars_data/', 'saved image path for training')
+    flags.DEFINE_string('save_image_root', './data/new_my_chars_train_data/', 'saved image path for training')
     try:
         app.run(main)
     except SystemExit:

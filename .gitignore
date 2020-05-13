@@ -151,3 +151,4 @@ dmypy.json
 /data/plate_uncut/
 /last_ckpts/
 /yolo-v3-tiny.keras.save/
+/data/

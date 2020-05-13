@@ -1,3 +1,5 @@
+from math import sqrt
+
 import tqdm
 from absl import app, flags, logging
 from absl.flags import FLAGS
@@ -11,6 +13,7 @@ from yolov3_tf2.models import (
 )
 import os
 
+MAGIC_NUMBER = 2.21
 
 #flags.DEFINE_string('output_path', './data/plate_uncut/', 'path to output images')
 
@@ -42,6 +45,13 @@ def main(_argv):
             x1, y1, x2, y2 = np.round(get_xy_tensor_from_boxes(img, boxes, 0, 0)).astype(int)
             pass
 
+        ym = (y1 + y2) / 2
+        xm = (x1 + x2) / 2
+        area = (y2 - y1 + 1) * (x2 - x1 + 1)
+        yd = sqrt(area / MAGIC_NUMBER) / 2
+        xd = yd * MAGIC_NUMBER
+        x1, x2 = int(round(xm - xd)), int(round(xm + xd))
+        y1, y2 = int(round(ym - yd)), int(round(ym + yd))
         xml_str = generate_xml(filename=filename, xy=(x1, y1, x2, y2))
         with open(os.path.join(FLAGS.xml_root_path, filename.replace('jpg', 'xml')), 'wb') as fp:
             fp.write(xml_str)
