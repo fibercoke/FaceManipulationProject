@@ -30,14 +30,14 @@ DATA_SIZE=13163
 VAL_SIZE=int(DATA_SIZE*0.20)
 time_str = strftime("%Y-%m-%d-%H%M%S")
 
-flags.DEFINE_string('ckpt_name', 'chars_checkpoints/my_resnet101v2_train_acc_{val_accuracy:.4f}_{epoch}_%s.tf' % time_str, 'checkpoint name')
-flags.DEFINE_string('tb_log_dir', 'chars_logs/chars/my_resnet101v2_%s' % time_str, 'tensorboard log dir')
+flags.DEFINE_string('ckpt_name', 'chars_checkpoints/new_my_resnet101v2_train_acc_{val_accuracy:.4f}_{epoch}_%s.tf' % time_str, 'checkpoint name')
+flags.DEFINE_string('tb_log_dir', 'chars_logs/chars/new_my_resnet101v2_%s' % time_str, 'tensorboard log dir')
 flags.DEFINE_integer('size', 32, 'size of each character should be resize to')
 flags.DEFINE_integer('epochs', 200, 'epoch num')
 flags.DEFINE_integer('batch_size', 32, 'size of each batch')
 flags.DEFINE_string('dataset_path', './data/chars_data.tfrecord', 'path to output dataset file')
-flags.DEFINE_string('train_dataset_path', './data/my_chars_data_train.tfrecord', 'path to output dataset file')
-flags.DEFINE_string('test_dataset_path', './data/my_chars_data_test.tfrecord', 'path to output dataset file')
+flags.DEFINE_string('train_dataset_path', './data/new_my_chars_train_data.tfrecord', 'path to output dataset file')
+flags.DEFINE_string('test_dataset_path', './data/new_my_chars_test_data.tfrecord', 'path to output dataset file')
 flags.DEFINE_string('classes_path', './data/chars_data.names', 'path to output class file')
 flags.DEFINE_bool('on_my_data', True, 'is on my data')
 
@@ -70,10 +70,10 @@ def main(_argv):
     model.summary()
 
     callbacks = [
-        ReduceLROnPlateau(monitor='val_accuracy', verbose=1, patience=12),
-        EarlyStopping(monitor='val_accuracy', patience=20, verbose=1),
-        ModelCheckpoint(FLAGS.ckpt_name, verbose=1, monitor='val_accuracy',
-                        save_best_only=True, save_weights_only=True, mode='max'),
+        ReduceLROnPlateau(monitor='val_loss', verbose=1, patience=12),
+        EarlyStopping(monitor='val_loss', patience=20, verbose=1),
+        ModelCheckpoint(FLAGS.ckpt_name, verbose=1, monitor='val_loss',
+                        save_best_only=True, save_weights_only=True, mode='min'),
         TensorBoard(log_dir=FLAGS.tb_log_dir)
     ]
 

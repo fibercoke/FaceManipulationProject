@@ -12,8 +12,13 @@ def detect(img, model):
         img = tf.expand_dims(img, axis=0)
     result = model(img)
     #print(result)
-    cls = tf.math.argmax(result, axis=1)
-    return cls
+    #print(result)
+    #result = np.array(result)
+    #result[2:3,10:] = 0
+    cls_1 = tf.math.argmax(result[:2], axis=1)
+    cls_2 = tf.math.argmax(result[2:4, :10], axis=1)
+    cls_3 = tf.math.argmax(result[4:], axis=1)
+    return tf.reshape(tf.stack([cls_1, cls_2, cls_3]), shape=6)
 
 def main(_argv):
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
@@ -33,7 +38,7 @@ def main(_argv):
     print(lst)
 
 if __name__ == '__main__':
-    flags.DEFINE_string('ckpt_name', './chars_checkpoints/resnet101v2_train_98.tf', 'checkpoint name')
+    flags.DEFINE_string('ckpt_name', './chars_checkpoints/new_my_resnet101v2_train_acc_0.8614_19_2020-05-21-235521.tf', 'checkpoint name')
     flags.DEFINE_integer('classifier_size', 32, 'size of each character should be resize to')
     flags.DEFINE_string('classes_path', './data/chars_data.names', 'path to output class file')
     flags.DEFINE_string('char_image_path', './data/Chars_data/A/11-5.jpg', 'path to input image')

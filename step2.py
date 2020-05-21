@@ -103,15 +103,15 @@ def main(_argv):
 
 
 if __name__ == '__main__':
-    flags.DEFINE_string('image_root_path', './data/Plate_dataset/AC/train/jpeg/', 'path to input image')
-    flags.DEFINE_string('xml_in_root_path', './data/Plate_dataset/AC/train/xml/', 'path to input xml')
+    flags.DEFINE_string('image_root_path', './data/Plate_dataset/AC/test/jpeg/', 'path to input image')
+    flags.DEFINE_string('xml_in_root_path', './data/Plate_dataset/AC/test/xml/', 'path to input xml')
     flags.DEFINE_string('xml_out_root_path', './data/Plate_dataset/AC/test/xml_pred/', 'path to output xml')
     flags.DEFINE_string('classifier_classes', './data/chars_data.names', 'path to classes file')
-    flags.DEFINE_string('classifier_weights', './chars_checkpoints/my_resnet101v2_train_acc_0.8100_33_2020-05-08-234204.tf', 'path to weights file')
+    flags.DEFINE_string('classifier_weights', './chars_checkpoints/new_my_resnet101v2_train_acc_0.8614_19_2020-05-21-235521.tf', 'path to weights file')
     flags.DEFINE_integer('classifier_size', 32, 'size of each character should be resize to')
     flags.DEFINE_bool('painting', False, 'if plt.show()')
-    flags.DEFINE_bool('save_image', True, 'should save image for training?')
-    flags.DEFINE_string('save_image_root', './data/new_my_chars_train_data/', 'saved image path for training')
+    flags.DEFINE_bool('save_image', False, 'should save image for training?')
+    flags.DEFINE_string('save_image_root', './data/new_my_chars_test_data/', 'saved image path for training')
     try:
         app.run(main)
     except SystemExit:
