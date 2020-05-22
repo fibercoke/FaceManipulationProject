@@ -9,9 +9,9 @@ import numpy as np
 import tensorflow as tf
 import os
 
-flags.DEFINE_string('dataset_path', './data/new_my_chars_train_data/', 'path to data dir')
-flags.DEFINE_string('dataset_output_path', './data/new_my_chars_train_data.tfrecord', 'path to output dataset file')
-flags.DEFINE_string('classes_output_path', './data/new_my_chars_train_data.names', 'path to output class file')
+flags.DEFINE_string('dataset_path', './data/new_my_chars_test_data/', 'path to data dir')
+flags.DEFINE_string('dataset_output_path', './data/new_my_chars_test_data.tfrecord', 'path to output dataset file')
+flags.DEFINE_string('classes_output_path', './data/new_my_chars_test_data.names', 'path to output class file')
 
 def build_example(img_path, label):
     img_raw = open(img_path, 'rb').read()

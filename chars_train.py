@@ -30,8 +30,8 @@ DATA_SIZE=13163
 VAL_SIZE=int(DATA_SIZE*0.20)
 time_str = strftime("%Y-%m-%d-%H%M%S")
 
-flags.DEFINE_string('ckpt_name', 'chars_checkpoints/new_my_resnet101v2_train_acc_{val_accuracy:.4f}_{epoch}_%s.tf' % time_str, 'checkpoint name')
-flags.DEFINE_string('tb_log_dir', 'chars_logs/chars/new_my_resnet101v2_%s' % time_str, 'tensorboard log dir')
+flags.DEFINE_string('ckpt_name', 'chars_checkpoints/new_my_none_resnet101v2_train_acc_{val_accuracy:.4f}_{epoch}_%s.tf' % time_str, 'checkpoint name')
+flags.DEFINE_string('tb_log_dir', 'chars_logs/chars/new_my_none_resnet101v2_%s' % time_str, 'tensorboard log dir')
 flags.DEFINE_integer('size', 32, 'size of each character should be resize to')
 flags.DEFINE_integer('epochs', 200, 'epoch num')
 flags.DEFINE_integer('batch_size', 32, 'size of each batch')
@@ -62,10 +62,12 @@ def main(_argv):
 
     class_map = {name: idx for idx, name in enumerate(open(FLAGS.classes_path).read().splitlines())}
     class_num = len(class_map)
-    model = CModel(FLAGS.size, class_num, 'imagenet')
+    model = CModel(FLAGS.size, class_num, None)
+    model.load_weights("chars_checkpoints/new_my_none_resnet101v2_train_acc_0.9067_16_2020-05-22-091211.tf").expect_partial()
 
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-                  optimizer=tf.keras.optimizers.Adam(),
+                  #optimizer=tf.keras.optimizers.Adam(),
+                  optimizer=tf.keras.optimizers.SGD(),
                   metrics=['accuracy'])
     model.summary()
 
