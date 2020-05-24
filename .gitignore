@@ -152,3 +152,8 @@ dmypy.json
 /last_ckpts/
 /yolo-v3-tiny.keras.save/
 /data/
+/originalPics/
+/debug.jpg
+/FDDB-folds/
+/FDDB-folds.tgz
+/originalPics.tar.gz

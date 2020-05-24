@@ -1,7 +1,11 @@
 <component name="ProjectDictionaryState">
   <dictionary name="maghsk">
     <words>
+      <w>ckpt</w>
       <w>platetext</w>
+      <w>tfrecord</w>
+      <w>wddb</w>
+      <w>yolov</w>
     </words>
   </dictionary>
 </component>
