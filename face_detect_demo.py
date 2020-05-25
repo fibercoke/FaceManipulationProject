@@ -4,6 +4,7 @@ from absl.flags import FLAGS
 import cv2
 import numpy as np
 import tensorflow as tf
+from tqdm import tqdm
 
 from yolov3_tf2.models import (
     YoloV3, YoloV3Tiny
@@ -13,6 +14,8 @@ import matplotlib.pyplot as plt
 import face_alignment
 from scipy.spatial import Delaunay
 from faceMorph import applyAffineTransform, morphTriangle
+import os
+
 
 flags.DEFINE_string('classes', './data/wddb_classes.names', 'path to classes file')
 # flags.DEFINE_string('weights', './checkpoints/yolov3_tiny_wddb20200524-110249_033.ckpt', 'path to weights file')
@@ -20,7 +23,9 @@ flags.DEFINE_string('weights', './checkpoints/yolov3_tiny_wddb_step220200524-125
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
 flags.DEFINE_integer('size', 416, 'resize images to')
 flags.DEFINE_integer('num_classes', 80, 'number of classes in the model')
-flags.DEFINE_string('t_path', './3.jpg', 'dest path')
+flags.DEFINE_string('t_path', './trump.jpg', 'dest path')
+flags.DEFINE_string('input', 'stream', 'input file or `stream`')
+flags.DEFINE_bool('save_each', False, 'Save each picture?')
 
 
 def transform_images(x_train, size):
@@ -56,15 +61,17 @@ def get_border_points(shape, split_num=10):
                       np.stack([np.ones(second.shape[0]) * (shape[0] - 1), second])[:, 1:-1]]).transpose()
 
 
-def apply_s_to_t(img1_raw, img2_raw, model, detector, alpha=0, beta=1):
+def apply_s_to_t(img1_raw, img2_raw, model, detector, alpha=0.0, beta=1.0, points2=None):
     img1 = tf.image.resize_with_pad(img1_raw, FLAGS.size, FLAGS.size).numpy()
     img2 = tf.image.resize_with_pad(img2_raw, FLAGS.size, FLAGS.size).numpy()
 
     points1 = np.vstack([get_landmarks(img1, model, detector)[0], get_border_points(img1.shape)])
     tri1 = Delaunay(points1)
 
-    points2 = np.vstack([get_landmarks(img2, model, detector)[0], get_border_points(img2.shape)])
-    tri2 = Delaunay(points2)
+    if points2 is None:
+        points2 = np.vstack([get_landmarks(img2, model, detector)[0], get_border_points(img2.shape)])
+
+    # tri2 = Delaunay(points2)
     # plot_tri_map(tri2, points2)
     # plot_tri_map(tri1, points1)
 
@@ -107,23 +114,41 @@ def main(_argv):
     class_names = [c.strip() for c in open(FLAGS.classes).readlines()]
     logging.info('classes loaded')
 
-    cam = cv2.VideoCapture(0)
+    cam = cv2.VideoCapture(0 if FLAGS.input == 'stream' else FLAGS.input)
     detector = face_alignment.FaceAlignment(landmarks_type=face_alignment.LandmarksType._2D)
     img_t = tf.image.decode_image(open(FLAGS.t_path, 'rb').read(), channels=3)
 
-    while True:
+    img2 = tf.image.resize_with_pad(img_t, FLAGS.size, FLAGS.size).numpy()
+    points2 = np.vstack([get_landmarks(img2, yolo, detector)[0], get_border_points(img2.shape)])
+
+    current_frame = 0
+    if FLAGS.save_each:
+        total_frame = cam.get(cv2.CAP_PROP_FRAME_COUNT)
+        if not os.path.exists('outputs'):
+            os.mkdir('outputs')
+        pbar = tqdm(total=total_frame)
+    while cam.isOpened():
+        current_frame += 1
         _, img_raw = cam.read()
         img_raw = cv2.cvtColor(img_raw, cv2.COLOR_BGR2RGB)
         try:
-            img_to_show = apply_s_to_t(img_raw, img_t, yolo, detector)
+            img_to_show = apply_s_to_t(img_raw, img_t, yolo, detector, alpha=0.5, beta=1, points2=points2)
         except Exception as e:
             print(e)
             img_to_show = img_raw
-        img_to_show = cv2.cvtColor(img_to_show, cv2.COLOR_RGB2BGR)
-        cv2.imshow('webcam', img_to_show)
+        if FLAGS.save_each:
+            pbar.update(1)
+            data = tf.image.encode_png(tf.convert_to_tensor(img_to_show))
+            with open('outputs/{total_frame:04d}.png'.format(total_frame=current_frame), 'wb') as f:
+                f.write(data.numpy())
+        else:
+            img_to_show = cv2.cvtColor(img_to_show, cv2.COLOR_RGB2BGR)
+            cv2.imshow('webcam', img_to_show)
 
-        if cv2.waitKey(1) == 27:
-            break  # esc to quit
+            if cv2.waitKey(1) == 27:
+                break  # esc to quit
+    if FLAGS.save_each:
+        pbar.close()
 
     cv2.destroyAllWindows()
     # cv2.imwrite(FLAGS.output, img)
