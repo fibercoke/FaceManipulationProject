@@ -44,12 +44,12 @@ def transform_images(x_train, size):
 
 def get_landmarks(img_rgb, model, detector):
     img = transform_images(img_rgb, FLAGS.size)
-    boxes, scores, classes, nums = model.predict(tf.expand_dims(img, 0))
-    boxes_new = boxes[0].numpy()
+    boxes, scores, classes, nums = model.predict_on_batch(tf.expand_dims(img, 0))
+    boxes_new = boxes[0]
     wh = np.flip(img.shape[0:2])
     boxes_new[:, 0:2] *= wh
     boxes_new[:, 2:4] *= wh
-    bbox = [i for i in np.hstack([boxes_new, scores.numpy().transpose()]) if i[4] > 0.4]
+    bbox = [i for i in np.hstack([boxes_new, scores.transpose()]) if i[4] > 0.4]
     return detector.get_landmarks_from_image(img_rgb, bbox)
 
 

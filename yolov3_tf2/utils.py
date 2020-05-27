@@ -75,7 +75,7 @@ def load_darknet_weights(model, weights_file, tiny=False):
     wf.close()
 
 
-def broadcast_iou(box_1, box_2):
+def broadcast_iou(box_1, box_2, return_iou=True):
     # box_1: (..., (x1, y1, x2, y2))
     # box_2: (N, (x1, y1, x2, y2))
 
@@ -98,6 +98,8 @@ def broadcast_iou(box_1, box_2):
                  (box_2[..., 3] - box_2[..., 1])
     union_area = box_1_area + box_2_area - int_area
     iou = int_area / union_area
+    if return_iou:
+        return iou
 
     enclose_left_up = tf.minimum(box_1[..., :2], box_2[..., :2])
     enclose_right_down = tf.maximum(box_1[..., 2:], box_2[..., 2:])

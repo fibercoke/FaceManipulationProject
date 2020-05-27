@@ -3,6 +3,7 @@ from absl.flags import FLAGS
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Model
+import IPython
 from tensorflow.keras.layers import (
     Add,
     Concatenate,
@@ -261,49 +262,39 @@ def YoloLoss(anchors, classes=80, ignore_thresh=0.5):
     def yolo_loss(y_true, y_pred):
         # 1. transform all pred outputs
         # y_pred: (batch_size, grid, grid, anchors, (x, y, w, h, obj, ...cls))
-        pred_box, pred_obj, pred_class = yolo_boxes(
-            y_pred, anchors, classes, calc_loss=True)
+        pred_box, pred_obj, pred_class = yolo_boxes(y_pred, anchors, classes, calc_loss=True)
 
-        pred_xy = (pred_box[..., 0:2] + pred_box[..., 2:4]) / 2
-        pred_wh = pred_box[..., 2:4] - pred_box[..., 0:2]
 
         # 2. transform all true outputs
         # y_true: (batch_size, grid, grid, anchors, (x1, y1, x2, y2, obj, cls))
-        true_box, true_obj, true_class_idx = tf.split(
-            y_true, (4, 1, 1), axis=-1)
-        true_xy = (true_box[..., 0:2] + true_box[..., 2:4]) / 2
-        true_wh = true_box[..., 2:4] - true_box[..., 0:2]
+        true_box, true_obj, true_class_idx = tf.split(y_true, (4, 1, 1), axis=-1)
 
         # give higher weights to small boxes
-        box_loss_scale = 2 - true_wh[..., 0] * true_wh[..., 1]
 
         # 4. calculate all masks
         obj_mask = tf.squeeze(true_obj, -1)
-        # ignore false positive when iou is over threshold
+        giou = 1.0 - broadcast_iou(pred_box, tf.boolean_mask(true_box, tf.cast(obj_mask, tf.bool)), return_iou=False)
         best_iou = tf.map_fn(
             lambda x: tf.reduce_max(broadcast_iou(x[0], tf.boolean_mask(
-                x[1], tf.cast(x[2], tf.bool))), axis=-1),
+                x[1], tf.cast(x[2], tf.bool)), return_iou=True), axis=-1),
             (pred_box, true_box, obj_mask),
             tf.float32)
         ignore_mask = tf.cast(best_iou < ignore_thresh, tf.float32)
 
         # 5. calculate all losses
-        xy_loss = obj_mask * box_loss_scale * \
-            tf.reduce_sum(tf.square(true_xy - pred_xy), axis=-1)
-        wh_loss = obj_mask * box_loss_scale * \
-            tf.reduce_sum(tf.square(true_wh - pred_wh), axis=-1)
-        obj_loss = binary_crossentropy(true_obj, pred_obj, from_logits=True)
+        obj_loss = binary_crossentropy(true_obj, pred_obj)
         obj_loss = obj_mask * obj_loss + \
             (1 - obj_mask) * ignore_mask * obj_loss
         # TODO: use binary_crossentropy instead
         class_loss = obj_mask * sparse_categorical_crossentropy(
-            true_class_idx, pred_class, from_logits=True)
+            true_class_idx, pred_class)
+        giou_loss = tf.reduce_sum(giou, axis=4) * (1.0 - ignore_mask)
 
         # 6. sum over (batch, gridx, gridy, anchors) => (batch, 1)
-        xy_loss = tf.reduce_sum(xy_loss, axis=(1, 2, 3))
-        wh_loss = tf.reduce_sum(wh_loss, axis=(1, 2, 3))
+        giou_loss = tf.reduce_sum(giou_loss, axis=(1, 2, 3))
         obj_loss = tf.reduce_sum(obj_loss, axis=(1, 2, 3))
         class_loss = tf.reduce_sum(class_loss, axis=(1, 2, 3))
+        # IPython.embed()
 
-        return xy_loss + wh_loss + obj_loss + class_loss
+        return giou_loss * 233 + obj_loss + class_loss
     return yolo_loss
