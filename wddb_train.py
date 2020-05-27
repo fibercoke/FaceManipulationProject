@@ -21,8 +21,8 @@ import yolov3_tf2.dataset_plate as dataset
 flags.DEFINE_string('train_dataset_path', './data/out-training.tfrecord', 'path to training dataset file')
 flags.DEFINE_string('test_dataset_path', './data/out-validation.tfrecord', 'path to validation dataset file')
 flags.DEFINE_string('classes', './data/wddb_classes.names', 'path to output class file')
-flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
-flags.DEFINE_string('prefix', 'yolov3_tiny_wddb',
+flags.DEFINE_boolean('tiny', False, 'yolov3 or yolov3-tiny')
+flags.DEFINE_string('prefix', 'yolov3_wddb_resize_only',
                     'path to weights file')
 flags.DEFINE_integer('size', 416, 'image size')
 flags.DEFINE_integer('epochs', 250, 'number of epochs')
@@ -39,8 +39,7 @@ def main(_argv):
         tf.config.experimental.set_memory_growth(physical_device, True)
 
     if FLAGS.tiny:
-        model = YoloV3Tiny(FLAGS.size, training=True,
-                           classes=FLAGS.num_classes)
+        model = YoloV3Tiny(FLAGS.size, training=True, classes=FLAGS.num_classes)
         anchors = yolo_tiny_anchors
         anchor_masks = yolo_tiny_anchor_masks
     else:
@@ -73,11 +72,10 @@ def main(_argv):
     prefix = FLAGS.prefix + time_str
 
     callbacks = [
-        ReduceLROnPlateau(patience=10, verbose=1, factor=0.2),
+        ReduceLROnPlateau(patience=10, verbose=1, factor=0.1),
         EarlyStopping(patience=25, verbose=1, restore_best_weights=True),
         ModelCheckpoint(os.path.join('checkpoints', prefix + '_{epoch:03d}.ckpt'),
-                        verbose=1,
-                        save_weights_only=True),
+                        verbose=1, save_best_only=True, save_weights_only=True),
         TensorBoard(log_dir=os.path.join('logs', prefix))
     ]
 

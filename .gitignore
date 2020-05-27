@@ -157,3 +157,6 @@ dmypy.json
 /FDDB-folds/
 /FDDB-folds.tgz
 /originalPics.tar.gz
+/outputs/
+/report/
+*.mp4

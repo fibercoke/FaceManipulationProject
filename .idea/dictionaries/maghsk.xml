@@ -2,6 +2,7 @@
   <dictionary name="maghsk">
     <words>
       <w>ckpt</w>
+      <w>kalman</w>
       <w>platetext</w>
       <w>tfrecord</w>
       <w>wddb</w>
