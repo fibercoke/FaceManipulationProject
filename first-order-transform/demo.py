@@ -14,6 +14,7 @@ from tqdm import tqdm
 from argparse import ArgumentParser
 import yaml
 import matplotlib
+import cv2
 matplotlib.use('Agg')
 
 
@@ -59,6 +60,9 @@ def load_checkpoints(config_path, checkpoint_path, cpu=True):
 def make_animation(source_image, driving_video, generator, kp_detector, relative=True, adapt_movement_scale=True, cpu=False):
     with torch.no_grad():
         predictions = []
+        keypoint_video = []
+        videoWriter = cv2.VideoWriter(
+            'kp.avi', cv2.VideoWriter_fourcc('P', 'I', 'M', '1'), 30, (256, 256))
         source = torch.tensor(source_image[np.newaxis].astype(
             np.float32)).permute(0, 3, 1, 2)
         if not cpu:
@@ -67,20 +71,52 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
             np.float32)).permute(0, 4, 1, 2, 3)
         kp_source = kp_detector(source)
         kp_driving_initial = kp_detector(driving[:, :, 0])
+        #
 
+        # ————————————————————————————————————————————
+        kp_value = kp_source['value'][0]
+        result_frame = source_image
+        (r, g, b) = cv2.split(result_frame)
+        result_frame = cv2.merge([b, g, r])
+        for kp in kp_value:
+            kp = kp+1
+            kp = kp*128  # /2 * 256
+            kp = tuple(kp)
+            print(kp)
+            cv2.circle(result_frame, kp, 2, (0, 255, 0), 4)
+
+        # ————————————————————————————————————————————
         for frame_idx in tqdm(range(driving.shape[2])):
             driving_frame = driving[:, :, frame_idx]
             if not cpu:
                 driving_frame = driving_frame.cuda()
             kp_driving = kp_detector(driving_frame)
-            kp_norm = normalize_kp(kp_source=kp_source, kp_driving=kp_driving,
-                                   kp_driving_initial=kp_driving_initial, use_relative_movement=relative,
-                                   use_relative_jacobian=relative, adapt_movement_scale=adapt_movement_scale)
-            out = generator(source, kp_source=kp_source, kp_driving=kp_norm)
-
-            predictions.append(np.transpose(
-                out['prediction'].data.cpu().numpy(), [0, 2, 3, 1])[0])
-    return predictions
+            # ————————————————————————————————————————————
+            kp_value = kp_driving['value'][0]
+            result_frame = np.transpose(
+                driving_frame.data.cpu().numpy(), [0, 2, 3, 1])[0]
+            (r, g, b) = cv2.split(result_frame)
+            result_frame = cv2.merge([b, g, r])
+            for kp in kp_value:
+                kp = kp+1
+                kp = kp*128  # /2 * 256
+                kp = tuple(kp)
+                cv2.circle(result_frame, kp, 2, (0, 255, 0), 4)
+            cv2.imshow('test', result_frame)
+            cv2.waitKey(10)
+            videoWriter.write(result_frame.astype(np.uint8))
+            keypoint_video.append(result_frame)
+            # ————————————————————————————————————————————
+            # kp_norm = normalize_kp(kp_source=kp_source, kp_driving=kp_driving,
+            #                       kp_driving_initial=kp_driving_initial, use_relative_movement=relative,
+            #                       use_relative_jacobian=relative, adapt_movement_scale=adapt_movement_scale)
+            #out = generator(source, kp_source=kp_source, kp_driving=kp_norm)
+            # out_frame = np.transpose(
+            #    out['prediction'].data.cpu().numpy(), [0, 2, 3, 1])[0]
+            # predictions.append(out_frame)
+        videoWriter.release()
+        print("finish\n")
+    return predictions, keypoint_video
 
 
 def find_best_frame(source, driving, cpu=False):
@@ -150,6 +186,7 @@ if __name__ == "__main__":
             driving_video.append(im)
     except RuntimeError:
         pass
+
     reader.close()
 
     source_image = resize(source_image, (256, 256))[..., :3]
@@ -164,13 +201,16 @@ if __name__ == "__main__":
         print("Best frame: " + str(i))
         driving_forward = driving_video[i:]
         driving_backward = driving_video[:(i+1)][::-1]
-        predictions_forward = make_animation(source_image, driving_forward, generator, kp_detector,
-                                             relative=opt.relative, adapt_movement_scale=opt.adapt_scale, cpu=opt.cpu)
-        predictions_backward = make_animation(source_image, driving_backward, generator,
-                                              kp_detector, relative=opt.relative, adapt_movement_scale=opt.adapt_scale, cpu=opt.cpu)
+        predictions_forward, keypoint_video_f = make_animation(source_image, driving_forward, generator, kp_detector,
+                                                               relative=opt.relative, adapt_movement_scale=opt.adapt_scale, cpu=opt.cpu)
+        predictions_backward, keypoint_video_b = make_animation(source_image, driving_backward, generator,
+                                                                kp_detector, relative=opt.relative, adapt_movement_scale=opt.adapt_scale, cpu=opt.cpu)
         predictions = predictions_backward[::-1] + predictions_forward[1:]
+        keypoint_video = keypoint_video_b[::-1] + keypoint_video_f[1:]
     else:
-        predictions = make_animation(source_image, driving_video, generator, kp_detector,
-                                     relative=opt.relative, adapt_movement_scale=opt.adapt_scale, cpu=opt.cpu)
-    imageio.mimsave(opt.result_video, [img_as_ubyte(
-        frame) for frame in predictions], fps=fps)
+        predictions, keypoint_video = make_animation(source_image, driving_video, generator, kp_detector,
+                                                     relative=opt.relative, adapt_movement_scale=opt.adapt_scale, cpu=opt.cpu)
+    # imageio.mimsave(opt.result_video, [img_as_ubyte(
+    #    frame) for frame in predictions], fps=fps)
+    imageio.mimsave("keypoint_video.mp4", [img_as_ubyte(
+        frame) for frame in keypoint_video], fps=fps)
