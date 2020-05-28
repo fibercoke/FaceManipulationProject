@@ -1,7 +1,7 @@
 # FaceManipulationProject
 ### 2020算分project
 
-初步计划：
+Timeline：
 
 5.1之前   尝试若干方法，尝试初步搭建基本的demo，评价各方法优劣 
 
@@ -9,6 +9,5 @@
 
 5.20之前  添加自己的改进，撰写报告 
 
-下一步重点：
+[Yolov3 detector & traditional approach to face manipulation](https://github.com/maghsk/FaceManipulationProject)
 
-中间结果可视化
